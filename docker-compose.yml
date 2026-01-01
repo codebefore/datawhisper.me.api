@@ -49,26 +49,6 @@ services:
     volumes:
       - ./logs:/app/logs
 
-  # React Frontend
-  datawhisper-ui:
-    build:
-      context: ./datawhisper-ui
-      dockerfile: Dockerfile
-      args:
-        BUILD_DATE: ${BUILD_DATE:-}
-        VCS_REF: ${VCS_REF:-}
-        VERSION: ${VERSION:-latest}
-    image: datawhisperme/datawhisper-ui:${VERSION:-latest}
-    container_name: datawhisper-ui
-    # Port removed - only accessible via Nginx reverse proxy for security
-    ports:
-      - "127.0.0.1:3000:80"
-    depends_on:
-      - datawhisper-api
-    networks:
-      - datawhisper-network
-    restart: unless-stopped
-
   # AI Service
   datawhisper-ai:
     build:
