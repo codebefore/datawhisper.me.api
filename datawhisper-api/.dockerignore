@@ -1,0 +1,10 @@
+**/.classpath
+**/.project
+**/.settings
+**/.factorypath
+/.vs/
+/Properties/launchSettings.json
+/Dockerfile
+/.dockerignore
+**/bin/
+**/obj/
