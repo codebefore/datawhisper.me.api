@@ -103,6 +103,7 @@ jobs:
             fi
 
             # Create docker-compose.yml with secrets from GitHub
+            # Use environment variables directly (they are exported by ssh-action)
             cat > docker-compose.yml <<EOF
             services:
               datawhisper-api:
