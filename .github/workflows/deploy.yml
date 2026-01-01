@@ -121,10 +121,11 @@ jobs:
                   - CACHE_TTL_MINUTES=5
                 networks:
                   - datawhisper-network
-                depends_on:
-                  - postgres
-                  - mongodb
-                  - datawhisper-ai
+
+            networks:
+              datawhisper-network:
+                external: true
+                name: datawhisperme_datawhisper-network
             EOF
 
             echo "🚀 Starting new container..."
