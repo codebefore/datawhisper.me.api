@@ -57,4 +57,5 @@ nunit-*.xml
 .env
 .env.local
 .env.production
-.env.*.local
+.env.*.localPRODUCTION_CREDENTIALS.md
+PRODUCTION_CREDENTIALS.md

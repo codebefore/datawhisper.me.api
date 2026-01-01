@@ -92,12 +92,6 @@ jobs:
           script: |
             cd /root/datawhisper/api-deploy
 
-            # Debug: Check if environment variables are set
-            echo "=== DEBUG: Environment Variables ==="
-            echo "PROD_DB_PASSWORD length: ${#PROD_DB_PASSWORD}"
-            echo "PROD_MONGO_PASSWORD length: ${#PROD_MONGO_PASSWORD}"
-            echo "PROD_OPENAI_API_KEY length: ${#PROD_OPENAI_API_KEY}"
-
             echo "📦 Loading Docker image..."
             docker load < api-image.tar.gz
             docker tag datawhisper-api:$GITHUB_VERSION datawhisper-api:latest
@@ -134,9 +128,6 @@ jobs:
                 external: true
                 name: datawhisperme_datawhisper-network
             EOF
-
-            echo "=== DEBUG: docker-compose.yml content ==="
-            cat docker-compose.yml
 
             echo "🚀 Starting new container..."
             docker compose up -d
