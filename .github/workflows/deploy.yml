@@ -88,7 +88,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SERVER_PORT }}
-          envs: GITHUB_VERSION,GITHUB_BUILD_DATE,GITHUB_VCS_REF
+          envs: GITHUB_VERSION,GITHUB_BUILD_DATE,GITHUB_VCS_REF,PROD_DB_PASSWORD,PROD_MONGO_PASSWORD,PROD_OPENAI_API_KEY
           script: |
             cd /root/datawhisper/api-deploy
 
@@ -102,7 +102,7 @@ jobs:
               docker compose down
             fi
 
-            # Create docker-compose.yml
+            # Create docker-compose.yml with secrets from GitHub
             cat > docker-compose.yml <<EOF
             services:
               datawhisper-api:
@@ -114,11 +114,12 @@ jobs:
                 environment:
                   - ASPNETCORE_ENVIRONMENT=Production
                   - ASPNETCORE_URLS=http://+:8080
-                  - ConnectionStrings__DefaultConnection=Host=postgres;Database=datawhisper;Username=datawhisper_user;Password=datawhisper_pass
-                  - ConnectionStrings__MongoDbConnection=mongodb://datawhisper_user:datawhisper_mongo_pass@mongodb:27017/datawhisper_analytics?authSource=admin
+                  - ConnectionStrings__DefaultConnection=Host=postgres;Database=datawhisper;Username=datawhisper_user;Password=$PROD_DB_PASSWORD
+                  - ConnectionStrings__MongoDbConnection=mongodb://datawhisper_user:$PROD_MONGO_PASSWORD@mongodb:27017/datawhisper_analytics?authSource=admin
                   - AI_SERVICE_URL=http://datawhisper-ai:5003
                   - LARGE_DATASET_THRESHOLD=10
                   - CACHE_TTL_MINUTES=5
+                  - OPENAI_API_KEY=$PROD_OPENAI_API_KEY
                 networks:
                   - datawhisper-network
 
