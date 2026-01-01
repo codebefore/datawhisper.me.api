@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_DB: datawhisper
       POSTGRES_USER: datawhisper_user
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-datawhisper_pass}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/northwind.sql:/docker-entrypoint-initdb.d/northwind.sql
@@ -32,8 +32,8 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8080
-      - ConnectionStrings__DefaultConnection=Host=postgres;Database=datawhisper;Username=datawhisper_user;Password=datawhisper_pass
-      - ConnectionStrings__MongoDbConnection=mongodb://datawhisper_user:datawhisper_mongo_pass@mongodb:27017/datawhisper_analytics?authSource=admin
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=datawhisper;Username=datawhisper_user;Password=${DB_PASSWORD}
+      - ConnectionStrings__MongoDbConnection=mongodb://datawhisper_user:${MONGO_PASSWORD}@mongodb:27017/datawhisper_analytics?authSource=admin
       - AI_SERVICE_URL=http://datawhisper-ai:5003
       - LARGE_DATASET_THRESHOLD=${LARGE_DATASET_THRESHOLD:-10}
       - CACHE_TTL_MINUTES=${CACHE_TTL_MINUTES:-5}
@@ -105,7 +105,7 @@ services:
       - "127.0.0.1:27017:27017"
     environment:
       - MONGO_INITDB_ROOT_USERNAME=datawhisper_user
-      - MONGO_INITDB_ROOT_PASSWORD=datawhisper_mongo_pass
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD}
       - MONGO_INITDB_DATABASE=datawhisper_analytics
     volumes:
       - mongodb_data:/data/db
