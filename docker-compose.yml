@@ -34,7 +34,7 @@ services:
       - ASPNETCORE_URLS=http://+:8080
       - ConnectionStrings__DefaultConnection=Host=postgres;Database=datawhisper;Username=datawhisper_user;Password=${DB_PASSWORD}
       - ConnectionStrings__MongoDbConnection=mongodb://datawhisper_user:${MONGO_PASSWORD}@mongodb:27017/datawhisper_analytics?authSource=admin
-      - AI_SERVICE_URL=http://datawhisper-ai:5003
+      - AI_SERVICE_URL=${AI_SERVICE_URL:-http://host.docker.internal:5003}
       - LARGE_DATASET_THRESHOLD=${LARGE_DATASET_THRESHOLD:-10}
       - CACHE_TTL_MINUTES=${CACHE_TTL_MINUTES:-5}
     # Port removed - only accessible via Nginx reverse proxy for security
@@ -42,39 +42,12 @@ services:
       - "127.0.0.1:8080:8080"
     depends_on:
       - postgres
-      - datawhisper-ai
     networks:
       - datawhisper-network
     restart: unless-stopped
     volumes:
       - ./logs:/app/logs
 
-  # AI Service
-  datawhisper-ai:
-    build:
-      context: ./datawhisper-ai-service
-      dockerfile: Dockerfile
-      args:
-        BUILD_DATE: ${BUILD_DATE:-}
-        VCS_REF: ${VCS_REF:-}
-        VERSION: ${VERSION:-latest}
-    image: datawhisperme/datawhisper-ai:${VERSION:-latest}
-    container_name: datawhisper-ai
-    # Port removed - only accessible within Docker network for security
-    ports:
-      - "127.0.0.1:5003:5003"
-    environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - FLASK_ENV=production
-      - SERVICE_HOST=0.0.0.0
-      - SERVICE_PORT=5003
-      - LARGE_DATASET_THRESHOLD=${LARGE_DATASET_THRESHOLD:-10}
-    depends_on:
-      - postgres
-      - mongodb
-    networks:
-      - datawhisper-network
-    restart: unless-stopped
 
   # MongoDB for Analytics
   mongodb:
