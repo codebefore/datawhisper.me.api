@@ -103,6 +103,7 @@ jobs:
             fi
 
             # Create docker-compose.yml with secrets from GitHub
+            # Variables from envs: are available as environment variables
             cat > docker-compose.yml <<EOF
             services:
               datawhisper-api:
@@ -114,12 +115,12 @@ jobs:
                 environment:
                   - ASPNETCORE_ENVIRONMENT=Production
                   - ASPNETCORE_URLS=http://+:8080
-                  - ConnectionStrings__DefaultConnection=Host=postgres;Database=datawhisper;Username=datawhisper_user;Password=$PROD_DB_PASSWORD
-                  - ConnectionStrings__MongoDbConnection=mongodb://datawhisper_user:$PROD_MONGO_PASSWORD@mongodb:27017/datawhisper_analytics?authSource=admin
+                  - ConnectionStrings__DefaultConnection=Host=postgres;Database=datawhisper;Username=datawhisper_user;Password=\${PROD_DB_PASSWORD}
+                  - ConnectionStrings__MongoDbConnection=mongodb://datawhisper_user:\${PROD_MONGO_PASSWORD}@mongodb:27017/datawhisper_analytics?authSource=admin
                   - AI_SERVICE_URL=http://datawhisper-ai:5003
                   - LARGE_DATASET_THRESHOLD=10
                   - CACHE_TTL_MINUTES=5
-                  - OPENAI_API_KEY=$PROD_OPENAI_API_KEY
+                  - OPENAI_API_KEY=\${PROD_OPENAI_API_KEY}
                 networks:
                   - datawhisper-network
 
