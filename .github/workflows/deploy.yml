@@ -159,3 +159,6 @@ jobs:
           GITHUB_VERSION: ${{ steps.version.outputs.VERSION }}
           GITHUB_BUILD_DATE: ${{ steps.version.outputs.BUILD_DATE }}
           GITHUB_VCS_REF: ${{ steps.version.outputs.VCS_REF }}
+          PROD_DB_PASSWORD: ${{ secrets.PROD_DB_PASSWORD }}
+          PROD_MONGO_PASSWORD: ${{ secrets.PROD_MONGO_PASSWORD }}
+          PROD_OPENAI_API_KEY: ${{ secrets.PROD_OPENAI_API_KEY }}
