@@ -59,3 +59,6 @@ nunit-*.xml
 .env.production
 .env.*.localPRODUCTION_CREDENTIALS.md
 PRODUCTION_CREDENTIALS.md
+
+# Docker Compose (local development, production creates its own)
+docker-compose.yml
