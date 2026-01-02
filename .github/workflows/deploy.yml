@@ -87,7 +87,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SERVER_PORT }}
-          envs: GITHUB_VERSION,GITHUB_BUILD_DATE,GITHUB_VCS_REF,PROD_DB_PASSWORD,PROD_MONGO_PASSWORD,PROD_OPENAI_API_KEY
+          envs: GITHUB_VERSION,GITHUB_BUILD_DATE,GITHUB_VCS_REF,PROD_DB_PASSWORD,PROD_MONGO_PASSWORD
           script: |
             cd /root/datawhisper/api-deploy
 
@@ -119,7 +119,6 @@ jobs:
                   - AI_SERVICE_URL=http://datawhisper-ai:5003
                   - LARGE_DATASET_THRESHOLD=10
                   - CACHE_TTL_MINUTES=5
-                  - OPENAI_API_KEY=${PROD_OPENAI_API_KEY}
                 networks:
                   - datawhisper-network
 
@@ -161,4 +160,3 @@ jobs:
           GITHUB_VCS_REF: ${{ steps.version.outputs.VCS_REF }}
           PROD_DB_PASSWORD: ${{ secrets.PROD_DB_PASSWORD }}
           PROD_MONGO_PASSWORD: ${{ secrets.PROD_MONGO_PASSWORD }}
-          PROD_OPENAI_API_KEY: ${{ secrets.PROD_OPENAI_API_KEY }}
