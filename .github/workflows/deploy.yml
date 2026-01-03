@@ -37,14 +37,26 @@ jobs:
             export RATE_LIMIT_GLOBAL_FALLBACK="${{ secrets.PROD_RATE_LIMIT_GLOBAL_FALLBACK }}"
             export CORS_ALLOWED_ORIGINS="${{ secrets.CORS_ALLOWED_ORIGINS }}"
             export LARGE_DATASET_THRESHOLD="${{ secrets.LARGE_DATASET_THRESHOLD }}"
-            
+            export REDIS_HOST="${{ secrets.REDIS_HOST }}"
+            export REDIS_PORT="${{ secrets.REDIS_PORT }}"
+            export REDIS_DB="${{ secrets.REDIS_DB }}"
+
             # Restart containers with new environment
             docker compose down
             docker compose up -d --build
             
             # Wait for services to be healthy
             sleep 10
-            
+
+            # Check if Redis is responding
+            docker exec datawhisper-redis redis-cli ping || exit 1
+
+            # Check if PostgreSQL is ready
+            docker exec datawhisper-db pg_isready -U datawhisper_user || exit 1
+
+            # Check if MongoDB is responding
+            docker exec datawhisper-mongodb mongosh --eval "db.adminCommand('ping')" --quiet || exit 1
+
             # Check if API is responding
             curl -f http://localhost:8080/api/system || exit 1
             echo "Deployment completed successfully"
