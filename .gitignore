@@ -62,3 +62,4 @@ PRODUCTION_CREDENTIALS.md
 
 # Docker Compose (local development, production creates its own)
 docker-compose.yml
+.env.production

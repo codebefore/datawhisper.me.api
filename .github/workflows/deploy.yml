@@ -9,15 +9,38 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Deploy to production server via SSH
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SSHKEY }}
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SERVER_PORT }}
           script: |
             cd /root/datawhisper.me.api
             git pull origin main
+            
+            # Export secrets to environment
+            export DB_PASSWORD="${{ secrets.PROD_DB_PASSWORD }}"
+            export MONGO_PASSWORD="${{ secrets.PROD_MONGO_PASSWORD }}"
+            export AI_SERVICE_URL="${{ secrets.PROD_AI_SERVICE_URL }}"
+            export OPENAI_API_KEY="${{ secrets.PROD_OPENAI_API_KEY }}"
+            export RATE_LIMIT_QUERY="${{ secrets.PROD_RATE_LIMIT_QUERY }}"
+            export RATE_LIMIT_ANALYTICS="${{ secrets.PROD_RATE_LIMIT_ANALYTICS }}"
+            export RATE_LIMIT_SYSTEM="${{ secrets.PROD_RATE_LIMIT_SYSTEM }}"
+            export RATE_LIMIT_GLOBAL="${{ secrets.PROD_RATE_LIMIT_GLOBAL }}"
+            export RATE_LIMIT_GLOBAL_FALLBACK="${{ secrets.PROD_RATE_LIMIT_GLOBAL_FALLBACK }}"
+            
+            # Restart containers with new environment
             docker-compose down
             docker-compose up -d --build
+            
+            # Wait for services to be healthy
+            sleep 10
+            
+            # Check if API is responding
+            curl -f http://localhost:8080/api/system || exit 1
             echo "Deployment completed successfully"
