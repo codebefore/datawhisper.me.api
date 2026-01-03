@@ -57,8 +57,11 @@ nunit-*.xml
 .env
 .env.local
 .env.production
-.env.*.localPRODUCTION_CREDENTIALS.md
+.env.*.local
 PRODUCTION_CREDENTIALS.md
+
+# Markdown documentation files (local reference only)
+*.md
 
 # Docker Compose (local development, production creates its own)
 docker-compose.yml
