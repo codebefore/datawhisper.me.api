@@ -24,6 +24,9 @@ namespace DataWhisper.API
 
             try
             {
+                // Fix placeholder dates like "YYYY-MM-DD"
+                fixedSql = FixPlaceholderDates(fixedSql);
+
                 // Fix GROUP BY issues in subqueries
                 fixedSql = FixSubqueryGroupBy(fixedSql);
 
@@ -41,6 +44,38 @@ namespace DataWhisper.API
                 _logger.LogWarning(ex, "Failed to fix SQL, returning original");
                 return originalSql;
             }
+        }
+
+        private string FixPlaceholderDates(string sql)
+        {
+            // Fix placeholder dates like "YYYY-MM-DD", "DD/MM/YYYY", etc.
+            // Replace with a valid date from the Northwind database (1996-1998)
+
+            // Pattern 1: 'YYYY-MM-DD' format
+            var pattern1 = @"'YYYY-MM-DD'";
+            if (Regex.IsMatch(sql, pattern1, RegexOptions.IgnoreCase))
+            {
+                _logger.LogWarning("Detected placeholder date 'YYYY-MM-DD', replacing with valid date");
+                sql = Regex.Replace(sql, pattern1, "'1996-07-15'", RegexOptions.IgnoreCase);
+            }
+
+            // Pattern 2: "YYYY-MM-DD" format (double quotes)
+            var pattern2 = @"""YYYY-MM-DD""";
+            if (Regex.IsMatch(sql, pattern2, RegexOptions.IgnoreCase))
+            {
+                _logger.LogWarning("Detected placeholder date \"YYYY-MM-DD\", replacing with valid date");
+                sql = Regex.Replace(sql, pattern2, "'1996-07-15'", RegexOptions.IgnoreCase);
+            }
+
+            // Pattern 3: Generic date patterns like YYYY-MM-DD (without quotes)
+            var pattern3 = @"\bYYYY-MM-DD\b";
+            if (Regex.IsMatch(sql, pattern3, RegexOptions.IgnoreCase))
+            {
+                _logger.LogWarning("Detected unquoted placeholder date, replacing with valid date");
+                sql = Regex.Replace(sql, pattern3, "1996-07-15", RegexOptions.IgnoreCase);
+            }
+
+            return sql;
         }
 
         private string FixSubqueryGroupBy(string sql)
