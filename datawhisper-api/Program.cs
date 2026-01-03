@@ -26,11 +26,14 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 // CORS for frontend
+var corsAllowedOrigins = builder.Configuration["CORS_ALLOWED_ORIGINS"]
+    ?? "http://localhost:3000;http://localhost:3001;http://localhost:5173";
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", builder =>
     {
-        builder.WithOrigins("http://localhost:3000", "http://localhost:3001", "http://localhost:5173")
+        builder.WithOrigins(corsAllowedOrigins.Split(';', StringSplitOptions.RemoveEmptyEntries))
                .AllowAnyMethod()
                .AllowAnyHeader()
                .AllowCredentials();
