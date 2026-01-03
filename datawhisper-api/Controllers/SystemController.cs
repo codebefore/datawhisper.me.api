@@ -46,7 +46,7 @@ namespace DataWhisper.API.Controllers
         [HttpGet]
         public IActionResult GetRoot()
         {
-            return Ok("DataWhisper API is running!");
+            return Ok(new { message = "DataWhisper API is running!", status = "healthy", timestamp = DateTime.UtcNow });
         }
     }
 }
