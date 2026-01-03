@@ -20,10 +20,18 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SERVER_PORT }}
           script: |
+            set -eux  # Exit on error, show commands, unset variables = error
+
             cd /root/datawhisper/api-deploy
 
             # Pull latest code from repository
+            echo "=== Pulling latest code from repository ==="
             git pull origin main
+            echo "✅ Git pull successful"
+
+            # Show current commit
+            echo "=== Current commit ==="
+            git log -1 --oneline
 
             # Update docker-compose.yml with CORS_ALLOWED_ORIGINS
             sed -i '/AI_SERVICE_URL=http:\/\/datawhisper-ai:5003/a\      - CORS_ALLOWED_ORIGINS=\${CORS_ALLOWED_ORIGINS:-https://datawhisper.me}' docker-compose.yml
@@ -45,21 +53,40 @@ jobs:
             export REDIS_DB="${{ secrets.REDIS_DB }}"
 
             # Restart containers with new environment
+            echo "=== Stopping old containers ==="
             docker compose down
+            echo "✅ Containers stopped"
+
+            echo "=== Building and starting new containers ==="
             docker compose up -d --build
-            
+            echo "✅ Containers started"
+
+            # Show running containers
+            echo "=== Running containers ==="
+            docker ps
+
             # Wait for services to be healthy
+            echo "=== Waiting for services to be healthy (10s) ==="
             sleep 10
 
             # Check if Redis is responding
-            docker exec datawhisper-redis redis-cli ping || exit 1
+            echo "=== Checking Redis ==="
+            docker exec datawhisper-redis redis-cli ping
+            echo "✅ Redis is healthy"
 
             # Check if PostgreSQL is ready
-            docker exec datawhisper-db pg_isready -U datawhisper_user || exit 1
+            echo "=== Checking PostgreSQL ==="
+            docker exec datawhisper-db pg_isready -U datawhisper_user
+            echo "✅ PostgreSQL is healthy"
 
             # Check if MongoDB is responding
-            docker exec datawhisper-mongodb mongosh --eval "db.adminCommand('ping')" --quiet || exit 1
+            echo "=== Checking MongoDB ==="
+            docker exec datawhisper-mongodb mongosh --eval "db.adminCommand('ping')" --quiet
+            echo "✅ MongoDB is healthy"
 
             # Check if API is responding
-            curl -f http://localhost:8080/api/system || exit 1
-            echo "Deployment completed successfully"
+            echo "=== Checking API ==="
+            curl -f http://localhost:8080/api/system
+            echo "✅ API is healthy"
+
+            echo "=== Deployment completed successfully ==="
