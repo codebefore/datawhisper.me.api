@@ -1,6 +1,7 @@
 using DataWhisper.API;
 using DataWhisper.API.Configuration;
 using DataWhisper.API.Data;
+using DataWhisper.API.Middleware;
 using DataWhisper.API.Models;
 using DataWhisper.API.Services;
 using MongoDB.Driver;
@@ -9,6 +10,7 @@ using StackExchange.Redis;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Options;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -308,8 +310,7 @@ app.MapGet("/api/system/metrics", async (IRedisMetricsService metricsService) =>
         is_dotnet_request = true // ✅ EXPLICIT MARKER
     });
 })
-.WithName("GetSystemMetrics")
-.WithOpenApi();
+.WithName("GetSystemMetrics");
 
 // Health check endpoint
 app.MapGet("/", () => "DataWhisper API is running!");

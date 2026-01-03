@@ -190,11 +190,11 @@ namespace DataWhisper.API.Services
 
                 return new AggregateMetrics
                 {
-                    TotalRequests = (int)dict.TryGetValue("total_requests", out var total) ? total : 0,
-                    SuccessfulRequests = (int)dict.TryGetValue("successful_requests", out var success) ? success : 0,
-                    FailedRequests = (int)dict.TryGetValue("failed_requests", out var failed) ? failed : 0,
-                    AvgResponseTimeMs = (double)dict.TryGetValue("avg_response_time_ms", out var avg) ? avg : 0,
-                    LastReset = DateTime.UnixEpoch.AddSeconds((double)(dict.TryGetValue("last_request_timestamp", out var ts) ? ts : 0))
+                    TotalRequests = dict.TryGetValue("total_requests", out var total) ? (int?)total ?? 0 : 0,
+                    SuccessfulRequests = dict.TryGetValue("successful_requests", out var success) ? (int?)success ?? 0 : 0,
+                    FailedRequests = dict.TryGetValue("failed_requests", out var failed) ? (int?)failed ?? 0 : 0,
+                    AvgResponseTimeMs = dict.TryGetValue("avg_response_time_ms", out var avg) ? (double?)avg ?? 0 : 0,
+                    LastReset = DateTime.UnixEpoch.AddSeconds(dict.TryGetValue("last_request_timestamp", out var ts) ? (double?)ts ?? 0 : 0)
                 };
             }
             catch (Exception ex)
@@ -219,7 +219,7 @@ namespace DataWhisper.API.Services
                 {
                     if (value.HasValue)
                     {
-                        var metric = JsonSerializer.Deserialize<RequestMetrics>(value!);
+                        var metric = JsonSerializer.Deserialize<RequestMetrics>(value.ToString()!);
                         if (metric != null)
                         {
                             metrics.Add(metric);
@@ -243,7 +243,7 @@ namespace DataWhisper.API.Services
                 var db = _redis.GetDatabase();
                 var key = "dotnet_performance:endpoint";
 
-                var endpoints = await db.SortedSetRangeByRankWithScoresAsync(key, order: Order.Descending, take: 20);
+                var endpoints = await db.SortedSetRangeByRankWithScoresAsync(key, 0, 19, Order.Descending);
                 var performanceList = new List<EndpointPerformance>();
 
                 foreach (var endpoint in endpoints)
@@ -299,9 +299,9 @@ namespace DataWhisper.API.Services
 
                 return new SqlPerformanceMetrics
                 {
-                    TotalQueries = (long)dict.TryGetValue("total_queries", out var total) ? total : 0,
-                    AvgExecutionTimeMs = (double)dict.TryGetValue("avg_execution_time_ms", out var avg) ? avg : 0,
-                    SlowQueriesCount = (long)dict.TryGetValue("slow_queries", out var slow) ? slow : 0
+                    TotalQueries = dict.TryGetValue("total_queries", out var total) ? (long?)total ?? 0L : 0L,
+                    AvgExecutionTimeMs = dict.TryGetValue("avg_execution_time_ms", out var avg) ? (double?)avg ?? 0 : 0,
+                    SlowQueriesCount = dict.TryGetValue("slow_queries", out var slow) ? (long?)slow ?? 0L : 0L
                 };
             }
             catch (Exception ex)
@@ -334,9 +334,9 @@ namespace DataWhisper.API.Services
 
                 return new AiServiceLatencyMetrics
                 {
-                    TotalCalls = (long)dict.TryGetValue("total_calls", out var total) ? total : 0,
-                    AvgLatencyMs = (double)dict.TryGetValue("avg_latency_ms", out var avg) ? avg : 0,
-                    LastCallTimestamp = DateTime.UnixEpoch.AddSeconds((double)(dict.TryGetValue("last_call_timestamp", out var ts) ? ts : 0))
+                    TotalCalls = dict.TryGetValue("total_calls", out var total) ? (long?)total ?? 0L : 0L,
+                    AvgLatencyMs = dict.TryGetValue("avg_latency_ms", out var avg) ? (double?)avg ?? 0 : 0,
+                    LastCallTimestamp = DateTime.UnixEpoch.AddSeconds(dict.TryGetValue("last_call_timestamp", out var ts) ? (double?)ts ?? 0 : 0)
                 };
             }
             catch (Exception ex)

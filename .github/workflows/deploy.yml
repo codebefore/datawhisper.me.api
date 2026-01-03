@@ -36,6 +36,7 @@ jobs:
             export RATE_LIMIT_GLOBAL="${{ secrets.PROD_RATE_LIMIT_GLOBAL }}"
             export RATE_LIMIT_GLOBAL_FALLBACK="${{ secrets.PROD_RATE_LIMIT_GLOBAL_FALLBACK }}"
             export CORS_ALLOWED_ORIGINS="${{ secrets.CORS_ALLOWED_ORIGINS }}"
+            export LARGE_DATASET_THRESHOLD="${{ secrets.LARGE_DATASET_THRESHOLD }}"
             
             # Restart containers with new environment
             docker compose down
