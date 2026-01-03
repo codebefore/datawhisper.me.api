@@ -1,5 +1,6 @@
 using StackExchange.Redis;
 using System.Text.Json;
+using DataWhisper.API.Configuration;
 using DataWhisper.API.Models;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
