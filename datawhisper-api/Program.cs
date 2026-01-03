@@ -1,9 +1,14 @@
 using DataWhisper.API;
+using DataWhisper.API.Configuration;
+using DataWhisper.API.Data;
 using DataWhisper.API.Models;
+using DataWhisper.API.Services;
 using MongoDB.Driver;
 using Microsoft.OpenApi.Models;
+using StackExchange.Redis;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Http;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -51,6 +56,31 @@ builder.Services.AddScoped(sp => {
     var client = sp.GetRequiredService<IMongoClient>();
     return client.GetDatabase("datawhisper_analytics");
 });
+
+// ✅ Add Monitoring Configuration
+builder.Services.Configure<MonitoringConfiguration>(
+    builder.Configuration.GetSection(MonitoringConfiguration.SectionName));
+
+// ✅ Add Redis Connection Multiplexer
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+{
+    var config = sp.GetRequiredService<IOptions<MonitoringConfiguration>>().Value;
+    var configurationOptions = ConfigurationOptions.Parse(config.RedisConnectionString);
+    configurationOptions.DefaultDatabase = config.RedisDbId;
+    configurationOptions.Password = config.RedisPassword;
+    configurationOptions.ConnectTimeout = config.ConnectTimeoutMs;
+    configurationOptions.SyncTimeout = config.SyncTimeoutMs;
+    configurationOptions.AbortOnConnectFail = false;
+    configurationOptions.ConnectRetry = 3;
+
+    return ConnectionMultiplexer.Connect(configurationOptions);
+});
+
+// ✅ Add Redis Metrics Service
+builder.Services.AddSingleton<IRedisMetricsService, RedisMetricsService>();
+
+// ✅ Add HTTP Context Accessor (needed for tracking)
+builder.Services.AddHttpContextAccessor();
 
 // Add AI Service Client
 builder.Services.AddHttpClient<AIServiceClient>(client =>
@@ -178,6 +208,11 @@ builder.Services.AddRateLimiter(options =>
 
 var app = builder.Build();
 
+// Initialize SQL Performance Tracker
+var redisMetricsService = app.Services.GetRequiredService<IRedisMetricsService>();
+var logger = app.Services.GetRequiredService<ILogger<Program>>();
+SqlPerformanceTracker.Initialize(redisMetricsService, logger);
+
 // Global Exception Handler
 app.UseExceptionHandler(errorApp =>
 {
@@ -216,6 +251,9 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+// ✅ Use Request Monitoring Middleware (tracks ALL requests)
+app.UseRequestMonitoring();
+
 // Use Forwarded Headers for rate limiting
 app.UseForwardedHeaders();
 
@@ -227,6 +265,51 @@ app.UseCors("AllowFrontend");
 
 // Map Controllers - All endpoints handled by controllers
 app.MapControllers();
+
+// ✅ Metrics endpoint - returns all monitoring data from Redis
+app.MapGet("/api/system/metrics", async (IRedisMetricsService metricsService) =>
+{
+    var aggregate = await metricsService.GetAggregateMetricsAsync();
+    var sqlPerf = await metricsService.GetSqlPerformanceMetricsAsync();
+    var aiLatency = await metricsService.GetAiServiceLatencyMetricsAsync();
+    var endpointPerf = await metricsService.GetEndpointPerformanceAsync();
+
+    return Results.Ok(new
+    {
+        service = "DataWhisper .NET API",
+        version = "1.0.0",
+        timestamp = DateTime.UtcNow,
+        aggregate = new
+        {
+            total_requests = aggregate?.TotalRequests ?? 0,
+            successful_requests = aggregate?.SuccessfulRequests ?? 0,
+            failed_requests = aggregate?.FailedRequests ?? 0,
+            avg_response_time_ms = aggregate?.AvgResponseTimeMs ?? 0
+        },
+        sql_performance = new
+        {
+            total_queries = sqlPerf?.TotalQueries ?? 0,
+            avg_execution_time_ms = sqlPerf?.AvgExecutionTimeMs ?? 0,
+            slow_queries_count = sqlPerf?.SlowQueriesCount ?? 0
+        },
+        ai_service_latency = new
+        {
+            total_calls = aiLatency?.TotalCalls ?? 0,
+            avg_latency_ms = aiLatency?.AvgLatencyMs ?? 0
+        },
+        endpoint_performance = endpointPerf.Select(ep => new
+        {
+            endpoint = ep.Endpoint,
+            request_count = ep.RequestCount,
+            avg_duration_ms = ep.AvgDurationMs,
+            slow_requests = ep.SlowRequests
+        }),
+        storage = "Redis",
+        is_dotnet_request = true // ✅ EXPLICIT MARKER
+    });
+})
+.WithName("GetSystemMetrics")
+.WithOpenApi();
 
 // Health check endpoint
 app.MapGet("/", () => "DataWhisper API is running!");

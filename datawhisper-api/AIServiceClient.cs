@@ -1,4 +1,6 @@
 using System.Text.Json;
+using DataWhisper.API.Services;
+using Microsoft.AspNetCore.Http;
 
 namespace DataWhisper.API
 {
@@ -6,11 +8,19 @@ namespace DataWhisper.API
     {
         private readonly HttpClient _httpClient;
         private readonly ILogger<AIServiceClient> _logger;
+        private readonly IRedisMetricsService? _metricsService;
+        private readonly IHttpContextAccessor? _httpContextAccessor;
 
-        public AIServiceClient(HttpClient httpClient, ILogger<AIServiceClient> logger)
+        public AIServiceClient(
+            HttpClient httpClient,
+            ILogger<AIServiceClient> logger,
+            IRedisMetricsService? metricsService = null,
+            IHttpContextAccessor? httpContextAccessor = null)
         {
             _httpClient = httpClient;
             _logger = logger;
+            _metricsService = metricsService;
+            _httpContextAccessor = httpContextAccessor;
 
             // Configure AI service base URL (use Docker service name in containers)
             var aiServiceUrl = Environment.GetEnvironmentVariable("AI_SERVICE_URL") ?? "http://datawhisper-ai:5001";
@@ -41,12 +51,35 @@ namespace DataWhisper.API
 
                 var response = await _httpClient.PostAsync("/api/generate-sql", content);
                 var requestDuration = DateTime.UtcNow - startTime;
+                var latencyMs = (long)requestDuration.TotalMilliseconds;
+
+                // ✅ Store AI service latency asynchronously
+                if (_metricsService != null)
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await _metricsService.UpdateAiServiceLatencyAsync(latencyMs);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Failed to store AI service latency metrics");
+                        }
+                    });
+
+                    // Store in HttpContext for request-level tracking
+                    if (_httpContextAccessor?.HttpContext != null)
+                    {
+                        _httpContextAccessor.HttpContext.Items["AiServiceCallTime"] = latencyMs;
+                    }
+                }
 
                 // COMPREHENSIVE LOGGING: Log HTTP response details
                 _logger.LogInformation("🔍 [AI_CLIENT_HTTP_RESPONSE] Received response - Status: {StatusCode}, Duration: {Duration}ms, Headers: {Headers}",
-                    response.StatusCode, requestDuration.TotalMilliseconds, string.Join(", ", response.Headers.Select(h => $"{h.Key}={string.Join(",", h.Value)}")));
+                    response.StatusCode, latencyMs, string.Join(", ", response.Headers.Select(h => $"{h.Key}={string.Join(",", h.Value)}")));
                 _logger.LogInformation("📨 AI Service Response - Status: {StatusCode}, Duration: {Duration}ms",
-                    response.StatusCode, requestDuration.TotalMilliseconds);
+                    response.StatusCode, latencyMs);
 
                 var responseJson = await response.Content.ReadAsStringAsync();
 
