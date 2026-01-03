@@ -15,6 +15,31 @@ using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// ✅ Configure Kestrel to fix HTTP/2 protocol errors
+builder.WebHost.ConfigureKestrel(options =>
+{
+    // Allow HTTP/2 but disable HTTP/3 for better compatibility
+    options.ListenAnyIP(8080, listenOptions =>
+    {
+        listenOptions.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1AndHttp2;
+        listenOptions.UseConnectionLogging();
+    });
+
+    // Set limits to prevent connection issues
+    options.Limits.MaxConcurrentConnections = 100;
+    options.Limits.MaxConcurrentUpgradedConnections = 100;
+    options.Limits.MaxRequestBodySize = 10 * 1024 * 1024; // 10 MB
+    options.Limits.MaxRequestHeadersTotalSize = 32 * 1024; // 32 KB
+    options.Limits.MaxRequestBufferSize = 1024 * 1024; // 1 MB
+    options.Limits.MaxResponseBufferSize = 1024 * 1024; // 1 MB
+
+    // Keep-alive timeout to prevent connection drops
+    options.Limits.KeepAliveTimeout = TimeSpan.FromMinutes(2);
+
+    // Request headers timeout
+    options.Limits.RequestHeadersTimeout = TimeSpan.FromSeconds(30);
+});
+
 // Add services to the container
 builder.Services.AddControllers();
 
