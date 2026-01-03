@@ -20,7 +20,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SERVER_PORT }}
           script: |
-            cd /root/datawhisper.me.api
+            cd /root/datawhisper/api-deploy
             git pull origin main
             
             # Export secrets to environment
