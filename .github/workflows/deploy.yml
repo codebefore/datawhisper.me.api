@@ -22,7 +22,15 @@ jobs:
           script: |
             set -eux  # Exit on error, show commands, unset variables = error
 
+            # Create deploy directory if it doesn't exist
+            mkdir -p /root/datawhisper/api-deploy
             cd /root/datawhisper/api-deploy
+
+            # Clone repository if directory is empty
+            if [ ! -f ".git/config" ]; then
+              echo "=== Cloning repository for the first time ==="
+              git clone https://github.com/codebefore/datawhisper.me.api.git .
+            fi
 
             # Pull latest code from repository
             echo "=== Pulling latest code from repository ==="
@@ -52,9 +60,17 @@ jobs:
             export REDIS_PORT="${{ secrets.REDIS_PORT }}"
             export REDIS_DB="${{ secrets.REDIS_DB }}"
 
+            # Create Docker network if it doesn't exist
+            echo "=== Checking Docker network ==="
+            if ! docker network ls | grep -q datawhisperme_datawhisper-network; then
+              echo "Creating Docker network..."
+              docker network create datawhisperme_datawhisper-network
+            fi
+            echo "✅ Docker network ready"
+
             # Restart containers with new environment
             echo "=== Stopping old containers ==="
-            docker compose down
+            docker compose down || true
             echo "✅ Containers stopped"
 
             echo "=== Building and starting new containers ==="
