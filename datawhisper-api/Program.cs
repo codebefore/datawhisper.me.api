@@ -18,10 +18,10 @@ var builder = WebApplication.CreateBuilder(args);
 // ✅ Configure Kestrel to fix HTTP/2 protocol errors
 builder.WebHost.ConfigureKestrel(options =>
 {
-    // Allow HTTP/2 but disable HTTP/3 for better compatibility
+    // Support HTTP/1.1, HTTP/2, and HTTP/3 for maximum compatibility
     options.ListenAnyIP(8080, listenOptions =>
     {
-        listenOptions.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1AndHttp2;
+        listenOptions.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1AndHttp2AndHttp3;
         listenOptions.UseConnectionLogging();
     });
 
