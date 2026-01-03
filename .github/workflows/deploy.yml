@@ -26,20 +26,20 @@ jobs:
             sed -i '/AI_SERVICE_URL=http:\/\/datawhisper-ai:5003/a\      - CORS_ALLOWED_ORIGINS=\${CORS_ALLOWED_ORIGINS:-https://datawhisper.me}' docker-compose.yml
 
             # Export secrets to environment
-            export DB_PASSWORD="${{ secrets.PROD_DB_PASSWORD }}"
-            export MONGO_PASSWORD="${{ secrets.PROD_MONGO_PASSWORD }}"
-            export AI_SERVICE_URL="${{ secrets.PROD_AI_SERVICE_URL }}"
-            export OPENAI_API_KEY="${{ secrets.PROD_OPENAI_API_KEY }}"
-            export RATE_LIMIT_QUERY="${{ secrets.PROD_RATE_LIMIT_QUERY }}"
-            export RATE_LIMIT_ANALYTICS="${{ secrets.PROD_RATE_LIMIT_ANALYTICS }}"
-            export RATE_LIMIT_SYSTEM="${{ secrets.PROD_RATE_LIMIT_SYSTEM }}"
-            export RATE_LIMIT_GLOBAL="${{ secrets.PROD_RATE_LIMIT_GLOBAL }}"
-            export RATE_LIMIT_GLOBAL_FALLBACK="${{ secrets.PROD_RATE_LIMIT_GLOBAL_FALLBACK }}"
+            export DB_PASSWORD="${{ secrets.DB_PASSWORD }}"
+            export MONGO_PASSWORD="${{ secrets.MONGO_PASSWORD }}"
+            export AI_SERVICE_URL="${{ secrets.AI_SERVICE_URL }}"
+            export OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}"
+            export RATE_LIMIT_QUERY="${{ secrets.RATE_LIMIT_QUERY }}"
+            export RATE_LIMIT_ANALYTICS="${{ secrets.RATE_LIMIT_ANALYTICS }}"
+            export RATE_LIMIT_SYSTEM="${{ secrets.RATE_LIMIT_SYSTEM }}"
+            export RATE_LIMIT_GLOBAL="${{ secrets.RATE_LIMIT_GLOBAL }}"
+            export RATE_LIMIT_GLOBAL_FALLBACK="${{ secrets.RATE_LIMIT_GLOBAL_FALLBACK }}"
             export CORS_ALLOWED_ORIGINS="${{ secrets.CORS_ALLOWED_ORIGINS }}"
             
             # Restart containers with new environment
-            docker-compose down
-            docker-compose up -d --build
+            docker compose down
+            docker compose up -d --build
             
             # Wait for services to be healthy
             sleep 10
