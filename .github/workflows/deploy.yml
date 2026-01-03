@@ -1,174 +1,23 @@
-name: Deploy API to Production
+name: Deploy to Production
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Generate version tag
-        id: version
-        run: |
-          VERSION=$(date +'%Y.%m.%d')-${{ github.sha }}
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-          echo "BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
-          echo "VCS_REF=${{ github.sha }}" >> $GITHUB_OUTPUT
-          echo "📦 Version: $VERSION"
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./datawhisper-api
-          file: ./datawhisper-api/Dockerfile
-          push: false
-          load: true
-          tags: datawhisper-api:${{ steps.version.outputs.VERSION }}
-          build-args: |
-            VERSION=${{ steps.version.outputs.VERSION }}
-            BUILD_DATE=${{ steps.version.outputs.BUILD_DATE }}
-            VCS_REF=${{ steps.version.outputs.VCS_REF }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Save Docker image
-        run: |
-          docker save datawhisper-api:${{ steps.version.outputs.VERSION }} | gzip > api-image.tar.gz
-
-      - name: Prepare server directory
+      - name: Deploy to production server
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SERVER_PORT }}
-          envs: GITHUB_VERSION,GITHUB_BUILD_DATE,GITHUB_VCS_REF
+          host: ${{ secrets.PRODUCTION_HOST }}
+          username: ${{ secrets.PRODUCTION_USER }}
+          key: ${{ secrets.PRODUCTION_SSH_KEY }}
           script: |
-            echo "🚀 Starting API deployment to server..."
-            echo "📦 Version: $GITHUB_VERSION"
-            echo "📅 Build Date: $GITHUB_BUILD_DATE"
-            echo "🔖 Git SHA: $GITHUB_VCS_REF"
-
-            # Create deployment directory if not exists
-            mkdir -p /root/datawhisper/api-deploy
-            cd /root/datawhisper/api-deploy
-
-            # Clean old files
-            rm -f api-image.tar.gz
-
-            echo "📥 Waiting for Docker image transfer..."
-            # The image will be transferred via SCP
-
-      - name: Transfer Docker image to server
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SERVER_PORT }}
-          source: "api-image.tar.gz"
-          target: "/root/datawhisper/api-deploy/"
-          strip_components: 0
-
-      - name: Load and restart container
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SERVER_PORT }}
-          envs: GITHUB_VERSION,GITHUB_BUILD_DATE,GITHUB_VCS_REF,PROD_DB_PASSWORD,PROD_MONGO_PASSWORD,PROD_OPENAI_API_KEY,PROD_RATE_LIMIT_QUERY,PROD_RATE_LIMIT_ANALYTICS,PROD_RATE_LIMIT_SYSTEM,PROD_RATE_LIMIT_GLOBAL,PROD_RATE_LIMIT_GLOBAL_FALLBACK
-          script: |
-            cd /root/datawhisper/api-deploy
-
-            echo "📦 Loading Docker image..."
-            docker load < api-image.tar.gz
-            docker tag datawhisper-api:$GITHUB_VERSION datawhisper-api:latest
-
-            # Check if existing docker-compose.yml exists
-            if [ -f docker-compose.yml ]; then
-              echo "🔄 Stopping existing containers..."
-              docker compose down
-            fi
-
-            # Create docker-compose.yml with secrets from GitHub
-            # Variables from envs: are available as environment variables
-            cat > docker-compose.yml <<'EOF'
-            services:
-              datawhisper-api:
-                image: datawhisper-api:latest
-                container_name: datawhisper-api
-                restart: unless-stopped
-                ports:
-                  - "127.0.0.1:8080:8080"
-                environment:
-                  - ASPNETCORE_ENVIRONMENT=Production
-                  - ASPNETCORE_URLS=http://+:8080
-                  - ConnectionStrings__DefaultConnection=Host=postgres;Database=datawhisper;Username=datawhisper_user;Password=${PROD_DB_PASSWORD}
-                  - ConnectionStrings__MongoDbConnection=mongodb://datawhisper_user:${PROD_MONGO_PASSWORD}@mongodb:27017/datawhisper_analytics?authSource=admin
-                  - AI_SERVICE_URL=http://datawhisper-ai:5003
-                  - LARGE_DATASET_THRESHOLD=10
-                  - CACHE_TTL_MINUTES=5
-                  - OPENAI_API_KEY=${PROD_OPENAI_API_KEY}
-                  - RATE_LIMIT_QUERY=${PROD_RATE_LIMIT_QUERY}
-                  - RATE_LIMIT_ANALYTICS=${PROD_RATE_LIMIT_ANALYTICS}
-                  - RATE_LIMIT_SYSTEM=${PROD_RATE_LIMIT_SYSTEM}
-                  - RATE_LIMIT_GLOBAL=${PROD_RATE_LIMIT_GLOBAL}
-                  - RATE_LIMIT_GLOBAL_FALLBACK=${PROD_RATE_LIMIT_GLOBAL_FALLBACK}
-                networks:
-                  - datawhisper-network
-
-            networks:
-              datawhisper-network:
-                external: true
-                name: datawhisperme_datawhisper-network
-            EOF
-
-            echo "🚀 Starting new container..."
-            docker compose up -d
-
-            # Clean up old images (keep last 3)
-            echo "🧹 Cleaning up old Docker images..."
-            docker images datawhisper-api --format "{{.Tag}}" | grep -E '^[0-9]{4}\.[0-9]{2}\.[0-9]{2}-' | sort -r | tail -n +4 | xargs -I {} docker rmi datawhisper-api:{} || true
-
-            echo "⏳ Waiting for API to start..."
-            sleep 15
-
-            echo "🏥 Health check..."
-            if docker ps | grep -q datawhisper-api; then
-              echo "✅ API container is running"
-              docker ps | grep datawhisper-api
-            else
-              echo "❌ API container is not running"
-              docker logs datawhisper-api --tail 20
-              exit 1
-            fi
-
-            echo "📊 Container status:"
-            docker ps | grep datawhisper-api
-
-            echo "✅ API deployment completed successfully!"
-            echo "🌐 API available at: http://160.20.111.45:8080"
-            echo "📦 Deployed version: $GITHUB_VERSION"
-        env:
-          GITHUB_VERSION: ${{ steps.version.outputs.VERSION }}
-          GITHUB_BUILD_DATE: ${{ steps.version.outputs.BUILD_DATE }}
-          GITHUB_VCS_REF: ${{ steps.version.outputs.VCS_REF }}
-          PROD_DB_PASSWORD: ${{ secrets.PROD_DB_PASSWORD }}
-          PROD_MONGO_PASSWORD: ${{ secrets.PROD_MONGO_PASSWORD }}
-          PROD_OPENAI_API_KEY: ${{ secrets.PROD_OPENAI_API_KEY }}
-          PROD_RATE_LIMIT_QUERY: ${{ secrets.PROD_RATE_LIMIT_QUERY }}
-          PROD_RATE_LIMIT_ANALYTICS: ${{ secrets.PROD_RATE_LIMIT_ANALYTICS }}
-          PROD_RATE_LIMIT_SYSTEM: ${{ secrets.PROD_RATE_LIMIT_SYSTEM }}
-          PROD_RATE_LIMIT_GLOBAL: ${{ secrets.PROD_RATE_LIMIT_GLOBAL }}
-          PROD_RATE_LIMIT_GLOBAL_FALLBACK: ${{ secrets.PROD_RATE_LIMIT_GLOBAL_FALLBACK }}
+            cd /root/datawhisper.me.api
+            git pull origin main
+            docker-compose down
+            docker-compose up -d --build
+            echo "Deployment completed"
