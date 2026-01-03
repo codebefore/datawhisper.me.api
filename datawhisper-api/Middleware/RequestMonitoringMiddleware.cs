@@ -44,6 +44,10 @@ namespace DataWhisper.API.Middleware
             context.Items["RequestId"] = requestId;
             context.Items["StartTime"] = startTime;
 
+            // ✅ Add headers BEFORE response starts (fixes "Headers are read-only" error)
+            context.Response.Headers.Append("X-Request-ID", requestId);
+            context.Response.Headers.Append("X-DotNet-Request", "true");
+
             try
             {
                 await _next(context);
@@ -80,10 +84,6 @@ namespace DataWhisper.API.Middleware
                         _logger.LogError(ex, "Failed to store metrics asynchronously");
                     }
                 });
-
-                // Add headers for tracing
-                context.Response.Headers.Append("X-Request-ID", requestId);
-                context.Response.Headers.Append("X-DotNet-Request", "true"); // ✅ HEADER MARKER
 
                 // Log slow requests
                 if (duration > _config.SlowRequestThresholdMs)
