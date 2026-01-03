@@ -3,11 +3,13 @@ using Npgsql;
 using Dapper;
 using DataWhisper.API;
 using System.Collections.Concurrent;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace DataWhisper.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [EnableRateLimiting("SystemPolicy")]
     public class SystemController : ControllerBase
     {
         private readonly ILogger<SystemController> _logger;

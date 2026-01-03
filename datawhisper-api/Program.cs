@@ -1,6 +1,9 @@
 using DataWhisper.API;
 using DataWhisper.API.Models;
 using MongoDB.Driver;
+using Microsoft.OpenApi.Models;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.HttpOverrides;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -65,6 +68,110 @@ builder.Services.AddLogging(builder =>
     builder.SetMinimumLevel(LogLevel.Information);
 });
 
+// Add Forwarded Headers for rate limiting
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
+// Add Rate Limiting
+builder.Services.AddRateLimiter(options =>
+{
+    // Global policy - applied to all endpoints unless overridden
+    options.AddPolicy("GlobalPolicy", context =>
+    {
+        return RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+            factory: _ => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = int.Parse(Environment.GetEnvironmentVariable("RATE_LIMIT_GLOBAL") ?? "100"),
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 2,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            });
+    });
+
+    // Query Controller - Strict limit (AI is expensive)
+    options.AddPolicy("QueryPolicy", context =>
+    {
+        return RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+            factory: _ => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = int.Parse(Environment.GetEnvironmentVariable("RATE_LIMIT_QUERY") ?? "30"),
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 2,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            });
+    });
+
+    // Analytics Controller - Medium limit (DB intensive)
+    options.AddPolicy("AnalyticsPolicy", context =>
+    {
+        return RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+            factory: _ => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = int.Parse(Environment.GetEnvironmentVariable("RATE_LIMIT_ANALYTICS") ?? "60"),
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 2,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            });
+    });
+
+    // System Controller - Lenient limit (health checks)
+    options.AddPolicy("SystemPolicy", context =>
+    {
+        return RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+            factory: _ => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = int.Parse(Environment.GetEnvironmentVariable("RATE_LIMIT_SYSTEM") ?? "200"),
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 2,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            });
+    });
+
+    // Configure global rejection response
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        context.HttpContext.Response.ContentType = "application/json";
+
+        var response = new
+        {
+            success = false,
+            message = "Rate limit exceeded. Please try again later.",
+            retryAfter = TimeSpan.FromSeconds(60).TotalSeconds,
+            timestamp = DateTime.UtcNow
+        };
+
+        await context.HttpContext.Response.WriteAsJsonAsync(response, cancellationToken);
+    };
+
+    // Global limiter - fallback for endpoints without specific policy
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+    {
+        return RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+            factory: _ => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = int.Parse(Environment.GetEnvironmentVariable("RATE_LIMIT_GLOBAL_FALLBACK") ?? "150"),
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 2,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            });
+    });
+});
+
 
 var app = builder.Build();
 
@@ -105,6 +212,12 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// Use Forwarded Headers for rate limiting
+app.UseForwardedHeaders();
+
+// Use Rate Limiting
+app.UseRateLimiter();
 
 // Use CORS
 app.UseCors("AllowFrontend");

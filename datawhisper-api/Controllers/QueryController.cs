@@ -3,11 +3,13 @@ using Npgsql;
 using Dapper;
 using DataWhisper.API.Models;
 using MongoDB.Driver;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace DataWhisper.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [EnableRateLimiting("QueryPolicy")]
     public class QueryController : ControllerBase
     {
         private readonly ILogger<QueryController> _logger;

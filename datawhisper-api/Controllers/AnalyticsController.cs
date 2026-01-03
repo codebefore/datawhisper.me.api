@@ -2,11 +2,13 @@ using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
 using MongoDB.Bson;
 using DataWhisper.API.Models;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace DataWhisper.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [EnableRateLimiting("AnalyticsPolicy")]
     public class AnalyticsController : ControllerBase
     {
         private readonly ILogger<AnalyticsController> _logger;

@@ -37,7 +37,7 @@ namespace DataWhisper.API
                 if (cachedValue.HasValue)
                 {
                     _logger.LogInformation("Cache hit for prompt: {Prompt}", prompt);
-                    return JsonSerializer.Deserialize<CachedQueryResponse>(cachedValue!);
+                    return JsonSerializer.Deserialize<CachedQueryResponse>(cachedValue.ToString()!);
                 }
 
                 _logger.LogDebug("Cache miss for prompt: {Prompt}", prompt);
