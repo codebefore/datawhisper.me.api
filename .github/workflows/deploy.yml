@@ -69,9 +69,14 @@ jobs:
             echo "✅ Docker network ready"
 
             # Restart containers with new environment
-            echo "=== Stopping old containers ==="
+            echo "=== Stopping and removing old containers ==="
             docker compose down || true
-            echo "✅ Containers stopped"
+
+            # Force remove any conflicting containers
+            echo "=== Removing any conflicting containers ==="
+            docker stop datawhisper-api datawhisper-db datawhisper-mongodb datawhisper-redis 2>/dev/null || true
+            docker rm datawhisper-api datawhisper-db datawhisper-mongodb datawhisper-redis 2>/dev/null || true
+            echo "✅ Old containers removed"
 
             echo "=== Building and starting new containers ==="
             docker compose up -d --build
