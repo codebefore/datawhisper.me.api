@@ -24,6 +24,7 @@ namespace DataWhisper.API
                 _logger.LogInformation("🤖 AI Service Request - Prompt: {Prompt}, Language: {Language}", prompt, language);
 
                 var startTime = DateTime.UtcNow;
+
                 var request = new { prompt = prompt, language = language };
                 var json = JsonSerializer.Serialize(request, new JsonSerializerOptions { WriteIndented = true });
 
