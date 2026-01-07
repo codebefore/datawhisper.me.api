@@ -53,9 +53,9 @@ namespace DataWhisper.API.Services
                 var state = Guid.NewGuid().ToString();
                 var authRequest = flow.CreateAuthorizationCodeRequest(_config.RedirectUri);
                 authRequest.State = state;
-                authRequest.AccessType = "offline";
-                authRequest.ApprovalPrompt = "force";
-                var uri = authRequest.Build();
+
+                // Build() returns Uri, convert to string
+                var uri = authRequest.Build().ToString();
 
                 _logger.LogInformation("Generated Google Drive OAuth authorization URL");
                 return uri;
