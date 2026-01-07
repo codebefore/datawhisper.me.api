@@ -64,9 +64,6 @@ nunit-*.xml
 **/client_id*.json
 docs/*secret*.json
 
-# Markdown documentation files (local reference only)
-*.md
-
 # Scripts (local development only)
 scripts/
 
