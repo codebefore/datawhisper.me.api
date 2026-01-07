@@ -51,11 +51,7 @@ namespace DataWhisper.API.Services
                 });
 
                 var state = Guid.NewGuid().ToString();
-                var uri = flow.CreateAuthorizationUrlRequest(_config.RedirectUri)
-                    .WithState(state)
-                    .WithAccessType("offline")
-                    .WithApprovalPrompt("force")
-                    .Build();
+                var uri = flow.CreateAuthorizationUrl(_config.RedirectUri, state, "offline", "force");
 
                 _logger.LogInformation("Generated Google Drive OAuth authorization URL");
                 return uri;
@@ -240,8 +236,9 @@ namespace DataWhisper.API.Services
                 }
 
                 // Create credential using the access token
-                var credential = GoogleCredential.FromAccessToken(token.AccessToken)
-                    .CreateScoped(_config.Scopes);
+                var credential = new GoogleCredential()
+                    .CreateScoped(_config.Scopes)
+                    .WithAccessToken(token.AccessToken);
 
                 var service = new DriveService(new BaseClientService.Initializer
                 {
@@ -267,6 +264,11 @@ namespace DataWhisper.API.Services
             {
                 _logger.LogInformation("Refreshing Google Drive access token");
 
+                var tokenResponse = new TokenResponse
+                {
+                    RefreshToken = oldToken.RefreshToken
+                };
+
                 var flow = new GoogleAuthorizationCodeFlow(new GoogleAuthorizationCodeFlow.Initializer
                 {
                     ClientSecrets = new ClientSecrets
@@ -275,11 +277,6 @@ namespace DataWhisper.API.Services
                         ClientSecret = _config.ClientSecret
                     }
                 });
-
-                var tokenResponse = new TokenResponse
-                {
-                    RefreshToken = oldToken.RefreshToken
-                };
 
                 await flow.RefreshTokenAsync("", tokenResponse, CancellationToken.None);
 
