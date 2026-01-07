@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Npgsql;
 using Dapper;
 using DataWhisper.API.Models;
+using DataWhisper.API.Services;
 using MongoDB.Driver;
 using Microsoft.AspNetCore.RateLimiting;
 

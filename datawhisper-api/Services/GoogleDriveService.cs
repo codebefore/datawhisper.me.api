@@ -51,7 +51,11 @@ namespace DataWhisper.API.Services
                 });
 
                 var state = Guid.NewGuid().ToString();
-                var uri = flow.CreateAuthorizationUrl(_config.RedirectUri, state, "offline", "force");
+                var uri = flow.CreateAuthorizationUrlRequest(_config.RedirectUri)
+                    .WithState(state)
+                    .WithAccessType("offline")
+                    .WithApprovalPrompt("force")
+                    .Build();
 
                 _logger.LogInformation("Generated Google Drive OAuth authorization URL");
                 return uri;
@@ -235,9 +239,9 @@ namespace DataWhisper.API.Services
                     }
                 }
 
-                var credential = new Google.Apis.Auth.OAuth2.GoogleCredential()
-                    .CreateScoped(_config.Scopes)
-                    .WithAccessToken(token.AccessToken);
+                // Create credential using the access token
+                var credential = GoogleCredential.FromAccessToken(token.AccessToken)
+                    .CreateScoped(_config.Scopes);
 
                 var service = new DriveService(new BaseClientService.Initializer
                 {
@@ -263,11 +267,6 @@ namespace DataWhisper.API.Services
             {
                 _logger.LogInformation("Refreshing Google Drive access token");
 
-                var tokenResponse = new TokenResponse
-                {
-                    RefreshToken = oldToken.RefreshToken
-                };
-
                 var flow = new GoogleAuthorizationCodeFlow(new GoogleAuthorizationCodeFlow.Initializer
                 {
                     ClientSecrets = new ClientSecrets
@@ -276,6 +275,11 @@ namespace DataWhisper.API.Services
                         ClientSecret = _config.ClientSecret
                     }
                 });
+
+                var tokenResponse = new TokenResponse
+                {
+                    RefreshToken = oldToken.RefreshToken
+                };
 
                 await flow.RefreshTokenAsync("", tokenResponse, CancellationToken.None);
 
