@@ -154,8 +154,14 @@ namespace DataWhisper.API.Services
                     };
                 }
 
-                // Check if token is expired
-                if (token.ExpiresAt <= DateTime.UtcNow.AddMinutes(5))
+                // Check if token is expired (ensure both are in UTC)
+                var tokenExpiresUtc = DateTime.SpecifyKind(token.ExpiresAt, DateTimeKind.Utc);
+                var utcNowWithBuffer = DateTime.UtcNow.AddMinutes(5);
+
+                _logger.LogInformation("Token expiry check - ExpiresAt: {ExpiresAt} (Kind: {Kind}), UTC Now + 5min: {UtcNow}, IsExpired: {IsExpired}",
+                    tokenExpiresUtc, tokenExpiresUtc.Kind, utcNowWithBuffer, tokenExpiresUtc <= utcNowWithBuffer);
+
+                if (tokenExpiresUtc <= utcNowWithBuffer)
                 {
                     _logger.LogWarning("Google Drive token is expired. IsConnected will be false.");
                     return new GoogleDriveStatus
