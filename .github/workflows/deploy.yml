@@ -59,6 +59,9 @@ jobs:
             export REDIS_HOST="${{ secrets.REDIS_HOST }}"
             export REDIS_PORT="${{ secrets.REDIS_PORT }}"
             export REDIS_DB="${{ secrets.REDIS_DB }}"
+            export GOOGLE_DRIVE_CLIENT_ID="${{ secrets.GOOGLE_DRIVE_CLIENT_ID }}"
+            export GOOGLE_DRIVE_CLIENT_SECRET="${{ secrets.GOOGLE_DRIVE_CLIENT_SECRET }}"
+            export GOOGLE_DRIVE_REDIRECT_URI="${{ secrets.GOOGLE_DRIVE_REDIRECT_URI }}"
 
             # Create Docker network if it doesn't exist
             echo "=== Checking Docker network ==="

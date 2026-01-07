@@ -141,6 +141,16 @@ namespace DataWhisper.API.Controllers
                 return validationResult;
             }
 
+            // Step 1.5: Check if this is a document Q&A request
+            var isDocMode = !string.IsNullOrEmpty(request.Mode) &&
+                             request.Mode.ToLower() == "doc";
+
+            if (isDocMode)
+            {
+                _logger.LogInformation("[{RequestId}] Document Q&A mode detected", requestId);
+                return await ExecuteDocumentQuery(request);
+            }
+
             // Step 2: Get or generate SQL
             var sqlResult = await GetOrGenerateSqlAsync(request.Prompt, requestId, request.DisableCache, request.Language);
             if (!sqlResult.IsSuccess)
@@ -505,6 +515,170 @@ namespace DataWhisper.API.Controllers
 
         #endregion
 
+        #region Document Q&A Methods
+
+        private async Task<IActionResult> ExecuteDocumentQuery(QueryRequest request)
+        {
+            var requestId = Guid.NewGuid();
+            var startTime = DateTime.UtcNow;
+
+            try
+            {
+                _logger.LogInformation("[{RequestId}] Processing document Q&A request", requestId);
+
+                // Get DocumentQAService from DI
+                var docQAService = HttpContext.RequestServices.GetService<DocumentQAService>();
+                if (docQAService == null)
+                {
+                    _logger.LogError("[{RequestId}] DocumentQAService not registered in DI", requestId);
+                    return Ok(new DocumentQueryResponse
+                    {
+                        Success = false,
+                        Message = "Document Q&A service not available",
+                        Timestamp = DateTime.UtcNow
+                    });
+                }
+
+                // Check Google Drive connection
+                var isConnected = await docQAService.IsConnectedAsync();
+                if (!isConnected)
+                {
+                    _logger.LogWarning("[{RequestId}] Google Drive not connected", requestId);
+                    return Ok(new DocumentQueryResponse
+                    {
+                        Success = false,
+                        Message = "Google Drive is not connected. Please connect your account first using /api/query/google-drive/connect/start",
+                        Timestamp = DateTime.UtcNow
+                    });
+                }
+
+                // Process document query
+                var result = await docQAService.AnswerDocumentQuestionAsync(
+                    request.Prompt,
+                    request.Language ?? "en"
+                );
+
+                // Calculate duration
+                var totalDuration = DateTime.UtcNow - startTime;
+
+                // Log to MongoDB (non-critical)
+                try
+                {
+                    await LogDocumentQueryToHistory(_logger, _mongoDatabase, HttpContext, requestId,
+                        request.Prompt, totalDuration.TotalMilliseconds, result);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "[{RequestId}] Failed to log document query to history", requestId);
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[{RequestId}] Error processing document query", requestId);
+                return Ok(new DocumentQueryResponse
+                {
+                    Success = false,
+                    Message = "Error processing document query",
+                    Timestamp = DateTime.UtcNow
+                });
+            }
+        }
+
+        /// <summary>
+        /// Start Google Drive OAuth flow
+        /// </summary>
+        [HttpGet("google-drive/connect/start")]
+        public IActionResult StartGoogleDriveConnection()
+        {
+            try
+            {
+                var googleDriveService = HttpContext.RequestServices.GetRequiredService<GoogleDriveService>();
+
+                var authUrl = googleDriveService.GetAuthorizationUrl();
+
+                _logger.LogInformation("Google Drive OAuth flow initiated");
+
+                return Ok(new
+                {
+                    success = true,
+                    authorizationUrl = authUrl,
+                    message = "Navigate to the authorization URL to connect your Google Drive"
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error starting Google Drive connection");
+                return BadRequest(new
+                {
+                    success = false,
+                    message = "Failed to start Google Drive connection"
+                });
+            }
+        }
+
+        /// <summary>
+        /// Google Drive OAuth callback
+        /// </summary>
+        [HttpGet("google-drive/connect/callback")]
+        public async Task<IActionResult> GoogleDriveCallback(
+            [FromQuery] string code,
+            [FromQuery] string state)
+        {
+            try
+            {
+                _logger.LogInformation("Google Drive OAuth callback received");
+
+                var googleDriveService = HttpContext.RequestServices.GetRequiredService<GoogleDriveService>();
+
+                var success = await googleDriveService.ExchangeCodeForTokenAsync(code);
+
+                if (success)
+                {
+                    _logger.LogInformation("Google Drive connected successfully");
+                    return Redirect("/?google-drive-connected=true");
+                }
+                else
+                {
+                    _logger.LogWarning("Google Drive connection failed");
+                    return Redirect("/?google-drive-connected=false");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error exchanging Google Drive authorization code");
+                return Redirect("/?google-drive-connected=error");
+            }
+        }
+
+        /// <summary>
+        /// Get Google Drive connection status
+        /// </summary>
+        [HttpGet("google-drive/status")]
+        public async Task<IActionResult> GetGoogleDriveStatus()
+        {
+            try
+            {
+                var googleDriveService = HttpContext.RequestServices.GetRequiredService<GoogleDriveService>();
+
+                var status = await googleDriveService.GetConnectionStatusAsync();
+
+                return Ok(status);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting Google Drive status");
+                return Ok(new GoogleDriveStatus
+                {
+                    IsConnected = false,
+                    ConnectedAt = null
+                });
+            }
+        }
+
+        #endregion
+
 
         private static async Task LogQueryToHistory(ILogger logger, IMongoDatabase database, HttpContext context, Guid requestId, string prompt, string sql,
             double executionTimeMs, int rowCount, bool aiGenerated, AIGenerateSqlResponse? aiResponse, string? errorMessage)
@@ -573,6 +747,42 @@ namespace DataWhisper.API.Controllers
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "[{RequestId}] ⚠️ Failed to log error to MongoDB: {Error}", requestId, ex.Message);
+            }
+        }
+
+        private static async Task LogDocumentQueryToHistory(ILogger logger, IMongoDatabase database, HttpContext context,
+            Guid requestId, string question, double executionTimeMs, DocumentQueryResponse result)
+        {
+            try
+            {
+                // For document queries, we store them in a simplified format in query_history
+                var document = new QueryHistoryDocument
+                {
+                    RequestId = requestId.ToString(),
+                    Timestamp = DateTime.UtcNow,
+                    Prompt = question,
+                    Sql = $"MODE: doc | FILES: {result.TopDocuments.Length} | SUCCESS: {result.Success}",
+                    AiGenerated = false,
+                    ExecutionTimeMs = executionTimeMs,
+                    RowCount = 0,
+                    Success = result.Success,
+                    TablesAccessed = new List<string>(),
+                    Model = "doc-qa",
+                    ErrorMessage = result.Success ? string.Empty : (result.Message ?? string.Empty),
+                    UserIdentifier = context.User?.Identity?.Name ?? "anonymous",
+                    IpAddress = context.Connection?.RemoteIpAddress?.ToString(),
+                    UserAgent = context.Request?.Headers["User-Agent"].ToString()
+                };
+
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                var collection = database.GetCollection<QueryHistoryDocument>("query_history");
+                await collection.InsertOneAsync(document, cancellationToken: cts.Token);
+
+                logger.LogInformation("[{RequestId}] Document query logged to MongoDB", requestId);
+            }
+            catch (Exception mongoEx)
+            {
+                logger.LogWarning(mongoEx, "[{RequestId}] ⚠️ Failed to log document query to MongoDB: {Error}", requestId, mongoEx.Message);
             }
         }
     }

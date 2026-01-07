@@ -95,6 +95,14 @@ builder.Services.AddHttpClient<AIServiceClient>(client =>
 // Add SQL Fixer Service
 builder.Services.AddScoped<SqlFixerService>();
 
+// Add Google Drive Configuration
+builder.Services.Configure<DataWhisper.API.Configuration.GoogleDriveConfiguration>(
+    builder.Configuration.GetSection(DataWhisper.API.Configuration.GoogleDriveConfiguration.SectionName));
+
+// Add Google Drive Services
+builder.Services.AddScoped<DataWhisper.API.Services.GoogleDriveService>();
+builder.Services.AddScoped<DataWhisper.API.Services.DocumentQAService>();
+
 // Add Logging
 builder.Services.AddLogging(builder =>
 {

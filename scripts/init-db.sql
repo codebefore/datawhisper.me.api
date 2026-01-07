@@ -352,3 +352,36 @@ WHERE status = 'success'
 GROUP BY prompt
 ORDER BY usage_count DESC
 LIMIT 50;
+
+-- Google Drive OAuth token storage
+CREATE TABLE IF NOT EXISTS google_drive_tokens (
+    id SERIAL PRIMARY KEY,
+    access_token TEXT NOT NULL,
+    refresh_token TEXT NOT NULL,
+    token_type VARCHAR(50) DEFAULT 'Bearer',
+    expires_at TIMESTAMP NOT NULL,
+    scope TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_active BOOLEAN DEFAULT TRUE
+);
+
+CREATE INDEX idx_google_drive_tokens_active ON google_drive_tokens(is_active);
+CREATE INDEX idx_google_drive_tokens_updated ON google_drive_tokens(updated_at);
+
+-- Function to update updated_at timestamp
+CREATE OR REPLACE FUNCTION update_google_drive_tokens_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Trigger to automatically update updated_at
+CREATE TRIGGER trigger_google_drive_tokens_updated_at
+    BEFORE UPDATE ON google_drive_tokens
+    FOR EACH ROW
+    EXECUTE FUNCTION update_google_drive_tokens_updated_at();
+
+COMMENT ON TABLE google_drive_tokens IS 'OAuth tokens for Google Drive API integration';

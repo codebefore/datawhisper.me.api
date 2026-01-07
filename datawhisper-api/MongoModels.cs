@@ -11,6 +11,7 @@ namespace DataWhisper.API.Models
         public int PageSize { get; init; } = 10;
         public bool DisableCache { get; init; } = false;
         public string? Language { get; init; } = "en";
+        public string? Mode { get; init; } = "sql";  // "sql" or "doc"
     }
 
     public class CachedSqlResponse

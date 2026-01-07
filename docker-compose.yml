@@ -61,6 +61,9 @@ services:
       - RATE_LIMIT_SYSTEM=${RATE_LIMIT_SYSTEM:-200}
       - RATE_LIMIT_GLOBAL=${RATE_LIMIT_GLOBAL:-100}
       - RATE_LIMIT_GLOBAL_FALLBACK=${RATE_LIMIT_GLOBAL_FALLBACK:-150}
+      - GoogleDrive__ClientId=${GOOGLE_DRIVE_CLIENT_ID}
+      - GoogleDrive__ClientSecret=${GOOGLE_DRIVE_CLIENT_SECRET}
+      - GoogleDrive__RedirectUri=${GOOGLE_DRIVE_REDIRECT_URI:-http://localhost:8080/api/query/google-drive/connect/callback}
       - MONITORING__REDISCONNECTIONSTRING=${REDIS_HOST:-redis}:${REDIS_PORT:-6379}
       - MONITORING__REDISDBID=${REDIS_DB:-0}
       - MONITORING__ENABLESQLTRACKING=true

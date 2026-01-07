@@ -1,5 +1,6 @@
 using System.Text.Json;
 using DataWhisper.API.Services;
+using DataWhisper.API.Models;
 using Microsoft.AspNetCore.Http;
 
 namespace DataWhisper.API
@@ -25,6 +26,103 @@ namespace DataWhisper.API
             // Configure AI service base URL (use Docker service name in containers)
             var aiServiceUrl = Environment.GetEnvironmentVariable("AI_SERVICE_URL") ?? "http://datawhisper-ai:5001";
             _httpClient.BaseAddress = new Uri(aiServiceUrl);
+        }
+
+        /// <summary>
+        /// Answer a question based on document contents
+        /// </summary>
+        public async Task<DocumentQAResponse?> AnswerDocumentQuestionAsync(
+            string question,
+            string[] documentContents,
+            string? language = "en")
+        {
+            try
+            {
+                _logger.LogInformation("🤖 AI Service Document QA Request - Question: {Question}, Documents: {DocCount}, Language: {Language}",
+                    question, documentContents.Length, language);
+
+                var startTime = DateTime.UtcNow;
+
+                var request = new
+                {
+                    question = question,
+                    documents = documentContents,
+                    language = language
+                };
+
+                var json = JsonSerializer.Serialize(request, new JsonSerializerOptions { WriteIndented = true });
+                _logger.LogDebug("📤 Document QA Request JSON: {Json}", json);
+
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+                var response = await _httpClient.PostAsync("/api/document-qa", content);
+                var requestDuration = DateTime.UtcNow - startTime;
+                var latencyMs = (long)requestDuration.TotalMilliseconds;
+
+                // Store metrics asynchronously
+                if (_metricsService != null)
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await _metricsService.UpdateAiServiceLatencyAsync(latencyMs);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Failed to store AI service latency metrics");
+                        }
+                    });
+                }
+
+                _logger.LogInformation("📨 Document QA Response - Status: {StatusCode}, Duration: {Duration}ms",
+                    response.StatusCode, latencyMs);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning("❌ AI Service Document QA failed with status: {StatusCode}", response.StatusCode);
+                    return null;
+                }
+
+                var responseJson = await response.Content.ReadAsStringAsync();
+                _logger.LogDebug("📥 Document QA Response JSON: {Json}", responseJson);
+
+                var qaResponse = JsonSerializer.Deserialize<DocumentQAResponse>(responseJson, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                if (qaResponse?.Success == true)
+                {
+                    _logger.LogInformation("✅ Document QA completed successfully");
+                    return qaResponse;
+                }
+                else
+                {
+                    _logger.LogWarning("⚠️ Document QA returned unsuccessful response");
+                    return qaResponse;
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError(ex, "🌐 HTTP error when calling AI service Document QA");
+                return null;
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogError(ex, "📄 JSON parsing error when calling AI service Document QA");
+                return null;
+            }
+            catch (TaskCanceledException ex)
+            {
+                _logger.LogError(ex, "⏰ AI service Document QA request timeout");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "💥 Unexpected error when calling AI service Document QA");
+                return null;
+            }
         }
 
         public async Task<AIGenerateSqlResponse?> GenerateSqlAsync(string prompt, string? language = "en")
