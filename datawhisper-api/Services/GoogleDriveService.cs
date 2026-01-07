@@ -51,7 +51,11 @@ namespace DataWhisper.API.Services
                 });
 
                 var state = Guid.NewGuid().ToString();
-                var uri = flow.CreateAuthorizationUrl(_config.RedirectUri, state, "offline", "force");
+                var authRequest = flow.CreateAuthorizationCodeRequest(_config.RedirectUri);
+                authRequest.State = state;
+                authRequest.AccessType = "offline";
+                authRequest.ApprovalPrompt = "force";
+                var uri = authRequest.Build();
 
                 _logger.LogInformation("Generated Google Drive OAuth authorization URL");
                 return uri;
@@ -236,9 +240,8 @@ namespace DataWhisper.API.Services
                 }
 
                 // Create credential using the access token
-                var credential = new GoogleCredential()
-                    .CreateScoped(_config.Scopes)
-                    .WithAccessToken(token.AccessToken);
+                var credential = GoogleCredential.FromAccessToken(token.AccessToken)
+                    .CreateScoped(_config.Scopes);
 
                 var service = new DriveService(new BaseClientService.Initializer
                 {
@@ -264,11 +267,6 @@ namespace DataWhisper.API.Services
             {
                 _logger.LogInformation("Refreshing Google Drive access token");
 
-                var tokenResponse = new TokenResponse
-                {
-                    RefreshToken = oldToken.RefreshToken
-                };
-
                 var flow = new GoogleAuthorizationCodeFlow(new GoogleAuthorizationCodeFlow.Initializer
                 {
                     ClientSecrets = new ClientSecrets
@@ -278,7 +276,8 @@ namespace DataWhisper.API.Services
                     }
                 });
 
-                await flow.RefreshTokenAsync("", tokenResponse, CancellationToken.None);
+                // RefreshTokenAsync expects userId (string) and refreshToken (string), not TokenResponse
+                var tokenResponse = await flow.RefreshTokenAsync("", oldToken.RefreshToken, CancellationToken.None);
 
                 var expiresAt = DateTime.UtcNow.AddSeconds(tokenResponse.ExpiresInSeconds ?? 3600);
 
