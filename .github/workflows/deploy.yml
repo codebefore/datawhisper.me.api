@@ -34,15 +34,13 @@ jobs:
 
             # Pull latest code from repository
             echo "=== Pulling latest code from repository ==="
-            git pull origin main
+            git fetch origin
+            git reset --hard origin/main
             echo "✅ Git pull successful"
 
             # Show current commit
             echo "=== Current commit ==="
             git log -1 --oneline
-
-            # Update docker-compose.yml with CORS_ALLOWED_ORIGINS
-            sed -i '/AI_SERVICE_URL=http:\/\/datawhisper-ai:5003/a\      - CORS_ALLOWED_ORIGINS=\${CORS_ALLOWED_ORIGINS:-https://datawhisper.me}' docker-compose.yml
 
             # Export secrets to environment
             export DB_PASSWORD="${{ secrets.PROD_DB_PASSWORD }}"
