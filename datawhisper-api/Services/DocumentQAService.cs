@@ -124,7 +124,7 @@ namespace DataWhisper.API.Services
                 }).ToArray();
 
                 _logger.LogInformation("Document Q&A completed successfully. Answer: {Answer}",
-                    aiResponse answer?.Substring(0, Math.Min(100, aiResponse.Answer.Length)) ?? "N/A");
+                    aiResponse.Answer?.Substring(0, Math.Min(100, aiResponse.Answer.Length)) ?? "N/A");
 
                 return new DocumentQueryResponse
                 {
