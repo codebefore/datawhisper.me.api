@@ -64,19 +64,45 @@ jobs:
             fi
             echo "✅ Docker network ready"
 
-            # Restart containers with new environment
-            echo "=== Stopping and removing old containers ==="
-            docker compose down || true
+            # Build Docker image
+            echo "=== Building Docker image ==="
+            cd /root/datawhisper/api-deploy/datawhisper-api
+            docker build -t datawhisper-api:latest .
+            echo "✅ Docker image built"
 
-            # Force remove any conflicting containers
-            echo "=== Removing any conflicting containers ==="
-            docker stop datawhisper-api datawhisper-db datawhisper-mongodb datawhisper-redis 2>/dev/null || true
-            docker rm datawhisper-api datawhisper-db datawhisper-mongodb datawhisper-redis 2>/dev/null || true
-            echo "✅ Old containers removed"
+            # Stop and remove old API container
+            echo "=== Stopping old API container ==="
+            docker stop datawhisper-api 2>/dev/null || true
+            docker rm datawhisper-api 2>/dev/null || true
 
-            echo "=== Building and starting new containers ==="
-            docker compose up -d --build
-            echo "✅ Containers started"
+            # Start new container
+            echo "=== Starting new API container ==="
+            docker run -d \
+              --name datawhisper-api \
+              --network datawhisperme_datawhisper-network \
+              --restart unless-stopped \
+              -p 127.0.0.1:8080:8080 \
+              -e ASPNETCORE_ENVIRONMENT=Production \
+              -e ASPNETCORE_URLS=http://+:8080 \
+              -e ConnectionStrings__DefaultConnection="Host=datawhisper-db;Database=datawhisper;Username=datawhisper_user;Password=${DB_PASSWORD}" \
+              -e ConnectionStrings__MongoDbConnection="mongodb://datawhisper_user:${MONGO_PASSWORD}@datawhisper-mongodb:27017/datawhisper_analytics?authSource=admin" \
+              -e AI_SERVICE_URL="${AI_SERVICE_URL}" \
+              -e CORS_ALLOWED_ORIGINS="${CORS_ALLOWED_ORIGINS}" \
+              -e LARGE_DATASET_THRESHOLD="${LARGE_DATASET_THRESHOLD}" \
+              -e RATE_LIMIT_QUERY="${RATE_LIMIT_QUERY}" \
+              -e RATE_LIMIT_ANALYTICS="${RATE_LIMIT_ANALYTICS}" \
+              -e RATE_LIMIT_SYSTEM="${RATE_LIMIT_SYSTEM}" \
+              -e RATE_LIMIT_GLOBAL="${RATE_LIMIT_GLOBAL}" \
+              -e RATE_LIMIT_GLOBAL_FALLBACK="${RATE_LIMIT_GLOBAL_FALLBACK}" \
+              -e MONITORING__REDISCONNECTIONSTRING="datawhisper-redis:6379" \
+              -e MONITORING__REDISDBID="${REDIS_DB}" \
+              -e MONITORING__ENABLESQLTRACKING=true \
+              -e MONITORING__ENABLEAISERVICETRACKING=true \
+              -e GoogleDrive__ClientId="${GOOGLE_DRIVE_CLIENT_ID}" \
+              -e GoogleDrive__ClientSecret="${GOOGLE_DRIVE_CLIENT_SECRET}" \
+              -e GoogleDrive__RedirectUri="${GOOGLE_DRIVE_REDIRECT_URI}" \
+              datawhisper-api:latest
+            echo "✅ API container started"
 
             # Show running containers
             echo "=== Running containers ==="
